@@ -10,8 +10,8 @@
 #include "nav_msgs/Odometry.h"
 
 serial::Serial ser;
-std::string port = "/dev/ttyACM0";
-int baudrate = 230400;
+std::string port = "/dev/ttyUSB0";
+int baudrate = 115200;
 std::vector<std::string> split(std::string str, std::string pattern)
 {
     std::string::size_type pos;
@@ -63,7 +63,7 @@ int main(int argc, char** argv)
     odom_to_pub.header.seq = 0;
     odom_to_pub.header.stamp = ros::Time::now();
     ros::Publisher encoder_pub = nh.advertise<nav_msgs::Odometry>("uwb_raw", 1);
-    ros::Rate r(500); // 10 hz
+    ros::Rate r(10); // 10 hz
 
     while(ros::ok()){
         std::string message;
@@ -79,32 +79,55 @@ int main(int argc, char** argv)
         split_result = split(message,"\n");
         for (int i = 0; i <split_result.size() ; ++i) {
             std::vector<double> data_raw;
+            std::vector<std::string> data_str;
             //have 7 result
-            split_result_sub = split(split_result[i],",");
+            split_result_sub = split(split_result[i]," ");
             bool final = false;
-            if(split_result_sub.size() == 7){
+            if(split_result_sub.size() == 13){
                 for (int j = 0; j < split_result_sub.size(); ++j) {
                     char *ptr;
                     data_raw.push_back(std::strtod(split_result_sub[j].c_str(),&ptr));
+                    data_str.push_back(split_result_sub[j].c_str());
                     final = true;
+                    std::cout<<" "<<i<<" " <<split_result[i]<<std::endl;
                 }
-            } else{
-                std::cout <<split_result_sub.size()<<" : "<<split_result[i]<<std::endl;
-            }
+            } /*else{
+
+            }*/
             if(final){
-                for (int i = 0; i < 6; ++i) {
-//                std::cout<<" x "<<data_raw[i];
+                int d_a = -1;
+                int d_b = -1;
+                int d_c = -1;
+                if(data_str[2]!="ffffffff"){
+                    d_a = std::stoi(data_str[2],nullptr,16);
+                } else{
+                     d_a = -1;
                 }
+                if(data_str[3]!="ffffffff"){
+                    d_b = std::stoi(data_str[3],nullptr,16);
+                } else{
+                    d_b = -1;
+                }
+                if(data_str[4]!="ffffffff"){
+                    d_c = std::stoi(data_str[4],nullptr,16);
+                } else{
+                    d_c = -1;
+                }
+
+                int i_a = std::stoi(data_str[10],nullptr,16);
+                int i_b = std::stoi(data_str[11],nullptr,16);
+                int i_c = std::stoi(data_str[12],nullptr,16);
                 odom_to_pub.header.seq = odom_to_pub.header.seq + 1;
                 odom_to_pub.header.stamp = ros::Time::now();
-                odom_to_pub.pose.pose.position.x = data_raw[3]/100;
-                odom_to_pub.pose.pose.position.y = data_raw[4]/100;
-                odom_to_pub.pose.pose.position.z = data_raw[5]/100;
-                odom_to_pub.pose.covariance[0] = data_raw[2]/100;
-                odom_to_pub.pose.covariance[7] = data_raw[2]/100;
-                odom_to_pub.pose.covariance[14] = data_raw[2]/100;
-                odom_to_pub.twist.twist.linear.x = data_raw[0]/100;
-                odom_to_pub.twist.twist.linear.y = data_raw[1]/100;
+                odom_to_pub.pose.pose.position.x = d_a/1000.0;
+                odom_to_pub.pose.pose.position.y = d_b/1000.0;
+                odom_to_pub.pose.pose.position.z = d_c/1000.0;
+
+                odom_to_pub.twist.twist.linear.x = i_a;
+                odom_to_pub.twist.twist.linear.y = i_b;
+                odom_to_pub.twist.twist.linear.z = i_c;
+                std::cout<<" out: "<<" " <<i_a<<" " <<i_b<<" " <<i_b<<std::endl;
+
                 encoder_pub.publish(odom_to_pub);
                 continue;
             }
